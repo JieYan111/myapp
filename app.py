@@ -26,13 +26,13 @@ income = st.number_input("本月收入 (TWD)", value=43000, step=1000)
 
 col1, col2, col3, col4 = st.columns(4)
 with col1:
-    p_life = st.number_input("生活 40%", value=40)
+    p_life = st.number_input("生活", value=40)
 with col2:
-    p_invest = st.number_input("投資 35%", value=35)
+    p_invest = st.number_input("投資", value=35)
 with col3:
-    p_random = st.number_input("隨機 20%", value=20) # 修正為 20% 湊 100%
+    p_random = st.number_input("隨機", value=20) # 修正為 20% 湊 100%
 with col4:
-    p_kid = st.number_input("小孩 5%", value=5)
+    p_kid = st.number_input("小孩", value=5)
 
 # 計算預算金額
 budget_invest = int(income * (p_invest / 100))
@@ -122,3 +122,4 @@ else:
 # ==========================================
 st.divider()
 st.caption("這是一個為未來專職 Trader 打造的資金管理系統")
+
