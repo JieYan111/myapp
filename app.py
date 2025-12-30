@@ -3,12 +3,42 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import io
 import datetime
+import os
+import matplotlib.font_manager as fm # 專門處理字型的工具
 
 # --- 網頁設定 ---
 st.set_page_config(page_title="Trader 資金戰情室", page_icon="💰", layout="wide") 
 
 # ==========================================
-# 0. 初始化 Session State (記憶體) - 保持不變
+# 🔧 字型修復專區 (解決口口口問題 - 最終版)
+# ==========================================
+def set_chinese_font():
+    # 這裡設定你上傳的檔案名稱
+    font_path = "NotoSansTC-Regular.ttf" 
+    
+    if os.path.exists(font_path):
+        # 1. 載入字體
+        fm.fontManager.addfont(font_path)
+        
+        # 2. 自動偵測這個字體的「內部名稱」 (這樣就不用怕打錯了)
+        prop = fm.FontProperties(fname=font_path)
+        font_name = prop.get_name()
+        
+        # 3. 設定 Matplotlib 使用這個字體
+        plt.rcParams['font.family'] = font_name
+        # print(f"成功載入字體: {font_name}") # 除錯用
+    else:
+        # 如果沒找到檔案，回退到預設 (可能會是口口口)
+        plt.rcParams['font.sans-serif'] = ['Microsoft JhengHei', 'Arial Unicode MS'] 
+    
+    # 解決負號 '-' 顯示成口的問題
+    plt.rcParams['axes.unicode_minus'] = False
+
+# 執行字型設定
+set_chinese_font()
+
+# ==========================================
+# 0. 初始化 Session State (記憶體)
 # ==========================================
 if 'portfolio' not in st.session_state:
     st.session_state.portfolio = [
@@ -41,12 +71,11 @@ st.title("💰 Trader 資金戰情室")
 st.caption("目標：專職交易 | 嚴格風控 | 資產增值")
 
 # ==========================================
-# 1. 流量管理 (本月收入) - 🔥 優化重點區
+# 1. 流量管理 (本月收入)
 # ==========================================
 with st.container():
     st.header("1. 流量管理 (Income Flow)")
     
-    # 輸入區
     col_inc, col_ratio = st.columns([1, 3])
     with col_inc:
         income = st.number_input("本月收入 (TWD)", value=43000, step=1000)
@@ -58,38 +87,31 @@ with st.container():
         with c3: p_random = st.number_input("隨機 %", value=20)
         with c4: p_kid = st.number_input("小孩 %", value=5)
 
-    # --- 🔥 優化邏輯開始 ---
-    # 1. 檢查總比例
     total_percent = p_life + p_invest + p_random + p_kid
     
     if total_percent != 100:
-        # 如果不是 100%，顯示紅色錯誤，並不計算金額
-        st.error(f"⚠️ 比例錯誤！目前總和為 {total_percent}% (必須等於 100%)，請調整數字。")
-        # 為了避免變數未定義錯誤，這裡給予暫時的 0 值
+        st.error(f"⚠️ 比例錯誤！目前總和為 {total_percent}% (必須等於 100%)")
         b_life = b_invest = b_random = b_kid = 0 
     else:
-        # 2. 如果正確，計算金額
         b_life = int(income * (p_life / 100))
         b_invest = int(income * (p_invest / 100))
         b_random = int(income * (p_random / 100))
         b_kid = int(income * (p_kid / 100))
         
-        # 3. 顯示結果 (使用 Metric 卡片，乾淨無亂碼)
         st.write("---")
         m1, m2, m3, m4 = st.columns(4)
-        # 格式：項目 (XX%)  |  $金額
         m1.metric(f"🏠 生活 ({p_life}%)", f"${b_life:,}")
         m2.metric(f"📈 投資 ({p_invest}%)", f"${b_invest:,}")
         m3.metric(f"🎲 隨機 ({p_random}%)", f"${b_random:,}")
         m4.metric(f"👶 小孩 ({p_kid}%)", f"${b_kid:,}")
 
 # ==========================================
-# 2. 策略管理 (定期定額) - 保持不變
+# 2. 策略管理 (定期定額)
 # ==========================================
 st.divider()
 st.header("2. 策略管理 (DCA Strategy)")
 
-if total_percent == 100: # 只有比例正確時才顯示預算
+if total_percent == 100:
     with st.expander("⚙️ 調整定期定額項目 (新增/刪除)", expanded=False):
         c_dca1, c_dca2, c_dca3 = st.columns([2, 2, 1])
         with c_dca1: dca_item = st.text_input("DCA 商品名稱")
@@ -120,10 +142,10 @@ if total_percent == 100: # 只有比例正確時才顯示預算
         else:
             st.error(f"⚠️ 預算透支！超支金額：**${abs(dca_rem):,}**")
 else:
-    st.warning("請先修正上方收入分配比例至 100%，才能計算投資預算。")
+    st.warning("請先修正上方收入分配比例至 100%")
 
 # ==========================================
-# 3. 存量管理 (總資產盤點) - 保持不變
+# 3. 存量管理 (總資產盤點)
 # ==========================================
 st.divider()
 st.header("3. 存量管理 (Net Worth)")
@@ -189,7 +211,7 @@ with c_chart2:
         st.progress(safe_assets / net_worth, text=f"🛡️ 防禦型 (Bank): {safe_assets/net_worth*100:.1f}%")
 
 # ==========================================
-# 4. Excel 匯出 - 保持不變
+# 4. Excel 匯出
 # ==========================================
 st.divider()
 df_flow = pd.DataFrame({
