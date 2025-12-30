@@ -14,7 +14,7 @@ st.set_page_config(page_title="Trader 資金戰情室", page_icon="💰", layout
 # ==========================================
 def set_chinese_font():
     # 這裡設定你上傳的檔案名稱
-    font_path = "NotoSansTC-Regular.ttf" 
+    font_path = "NotoSansTC-VariableFont_wght.ttf" 
     
     if os.path.exists(font_path):
         # 1. 載入字體
@@ -242,3 +242,4 @@ st.download_button(
     file_name=f"Trader_Report_{curr_date}.xlsx",
     mime="application/vnd.ms-excel"
 )
+
