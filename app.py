@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import io
 import datetime
 import os
-import json # 新增：用來處理存檔格式
+import json 
 import matplotlib.font_manager as fm
 
 # --- 網頁設定 ---
@@ -26,19 +26,17 @@ def set_chinese_font():
 set_chinese_font()
 
 # ==========================================
-# 💾 系統記憶功能 (存檔/讀檔) - 新增區塊
+# 💾 系統記憶功能 (存檔/讀檔)
 # ==========================================
 st.sidebar.title("⚙️ 系統設定")
-st.sidebar.caption("因雲端會重置資料，請善用存檔功能。")
+st.sidebar.caption("雲端會重置資料，請善用存檔。")
 
-# 1. 存檔 (下載 JSON)
-# 把目前的 Session State 打包成字典
+# 1. 存檔
 current_data = {
     "portfolio": st.session_state.get('portfolio', []),
     "asset_bank": st.session_state.get('asset_bank', []),
     "asset_crypto": st.session_state.get('asset_crypto', []),
     "asset_stock": st.session_state.get('asset_stock', []),
-    # 連同設定的比例一起存起來
     "settings": {
         "income": st.session_state.get('user_income', 43000),
         "p_life": st.session_state.get('p_life', 40),
@@ -47,34 +45,31 @@ current_data = {
         "p_kid": st.session_state.get('p_kid', 5)
     }
 }
-# 轉成 JSON 字串
 json_str = json.dumps(current_data, ensure_ascii=False, indent=4)
 
 st.sidebar.download_button(
     label="💾 下載備份檔 (Save)",
     data=json_str,
     file_name="trader_data_backup.json",
-    mime="application/json",
-    help="點擊下載，下次使用時上傳此檔案即可恢復資料。"
+    mime="application/json"
 )
 
 st.sidebar.divider()
 
-# 2. 讀檔 (上傳 JSON)
+# 2. 讀檔
 uploaded_file = st.sidebar.file_uploader("📂 載入備份檔 (Load)", type=["json"])
 
 if uploaded_file is not None:
     try:
-        # 讀取檔案
         loaded_data = json.load(uploaded_file)
         
-        # 覆蓋目前的 Session State
+        # 覆蓋資料
         st.session_state.portfolio = loaded_data.get("portfolio", [])
         st.session_state.asset_bank = loaded_data.get("asset_bank", [])
         st.session_state.asset_crypto = loaded_data.get("asset_crypto", [])
         st.session_state.asset_stock = loaded_data.get("asset_stock", [])
         
-        # 載入設定值
+        # 載入設定值 (寫入 session_state)
         settings = loaded_data.get("settings", {})
         st.session_state.user_income = settings.get("income", 43000)
         st.session_state.p_life = settings.get("p_life", 40)
@@ -82,14 +77,21 @@ if uploaded_file is not None:
         st.session_state.p_random = settings.get("p_random", 20)
         st.session_state.p_kid = settings.get("p_kid", 5)
 
-        st.sidebar.success("✅ 讀取成功！資料已恢復。")
+        st.sidebar.success("✅ 讀取成功！(請稍候或手動調整任一數值以刷新畫面)")
         
     except Exception as e:
         st.sidebar.error(f"讀取失敗：{e}")
 
 # ==========================================
-# 0. 初始化 Session State (若沒讀檔則使用預設值)
+# 0. 初始化 Session State (設定預設值)
 # ==========================================
+# 這裡先設定好預設值，下面的 widget 就會自動抓取，不需要再寫 value=...
+if 'user_income' not in st.session_state: st.session_state.user_income = 43000
+if 'p_life' not in st.session_state: st.session_state.p_life = 40
+if 'p_invest' not in st.session_state: st.session_state.p_invest = 35
+if 'p_random' not in st.session_state: st.session_state.p_random = 20
+if 'p_kid' not in st.session_state: st.session_state.p_kid = 5
+
 if 'portfolio' not in st.session_state:
     st.session_state.portfolio = [
         {"商品": "006208", "金額": 6000},
@@ -117,13 +119,6 @@ if 'asset_stock' not in st.session_state:
         {"項目": "期貨保證金", "金額": 90000}
     ]
 
-# 設定預設變數 (用於 input widget 的 key)
-if 'user_income' not in st.session_state: st.session_state.user_income = 43000
-if 'p_life' not in st.session_state: st.session_state.p_life = 40
-if 'p_invest' not in st.session_state: st.session_state.p_invest = 35
-if 'p_random' not in st.session_state: st.session_state.p_random = 20
-if 'p_kid' not in st.session_state: st.session_state.p_kid = 5
-
 st.title("💰 Trader 資金戰情室")
 st.caption("目標：專職交易 | 嚴格風控 | 資產增值")
 
@@ -135,15 +130,16 @@ with st.container():
     
     col_inc, col_ratio = st.columns([1, 3])
     with col_inc:
-        # 注意：這裡加上了 key，讓 session_state 可以連動控制輸入框
-        income = st.number_input("本月收入 (TWD)", value=st.session_state.user_income, step=1000, key="user_income")
+        # 🔥 修正點：這裡移除了 value=...，因為 key 已經存在
+        income = st.number_input("本月收入 (TWD)", step=1000, key="user_income")
     
     with col_ratio:
         c1, c2, c3, c4 = st.columns(4)
-        with c1: p_life = st.number_input("生活費 %", value=st.session_state.p_life, key="p_life")
-        with c2: p_invest = st.number_input("投資 %", value=st.session_state.p_invest, key="p_invest")
-        with c3: p_random = st.number_input("隨機 %", value=st.session_state.p_random, key="p_random")
-        with c4: p_kid = st.number_input("小孩 %", value=st.session_state.p_kid, key="p_kid")
+        # 🔥 修正點：這裡也都移除了 value=...
+        with c1: p_life = st.number_input("生活費 %", key="p_life")
+        with c2: p_invest = st.number_input("投資 %", key="p_invest")
+        with c3: p_random = st.number_input("隨機 %", key="p_random")
+        with c4: p_kid = st.number_input("小孩 %", key="p_kid")
 
     total_percent = p_life + p_invest + p_random + p_kid
     
