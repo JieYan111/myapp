@@ -96,7 +96,6 @@ if 'portfolio' not in st.session_state:
         {"商品": "VOO", "金額": 3000}
     ]
 
-# 這裡為了配合 data_editor，我們把預設值結構稍微標準化
 if 'asset_bank' not in st.session_state:
     st.session_state.asset_bank = [
         {"項目": "緊急預備金(定存)", "金額": 400000},
@@ -156,34 +155,30 @@ with st.container():
         m4.metric(f"👶 小孩 ({p_kid}%)", f"${b_kid:,}")
 
 # ==========================================
-# 2. 策略管理 (DCA) - 這裡也改用 Editor 方便操作
+# 2. 策略管理 (DCA)
 # ==========================================
 st.divider()
 st.header("2. 策略管理 (DCA Strategy)")
 
 if total_percent == 100:
-    # 準備資料
     df_dca = pd.DataFrame(st.session_state.portfolio)
     if df_dca.empty: df_dca = pd.DataFrame(columns=["商品", "金額"])
 
     st.caption("👇 直接點擊表格內容即可修改，表格下方有 [+] 可新增行，選取行後按 Delete 可刪除。")
     
-    # 🔥 使用 Data Editor 直接編輯
     edited_portfolio = st.data_editor(
         df_dca,
         column_config={
             "商品": st.column_config.TextColumn("商品名稱", required=True),
             "金額": st.column_config.NumberColumn("扣款金額", min_value=0, step=1000, format="$%d")
         },
-        num_rows="dynamic", # 允許新增/刪除行
+        num_rows="dynamic", 
         use_container_width=True,
         key="editor_portfolio"
     )
     
-    # 同步回 session_state
     st.session_state.portfolio = edited_portfolio.to_dict('records')
     
-    # 計算餘額
     dca_total = edited_portfolio["金額"].sum() if not edited_portfolio.empty else 0
     dca_rem = b_invest - dca_total
     
@@ -196,7 +191,7 @@ else:
     st.warning("請先修正上方收入分配比例至 100%")
 
 # ==========================================
-# 3. 存量管理 (總資產盤點) - 🔥 重大更新區
+# 3. 存量管理 (總資產盤點)
 # ==========================================
 st.divider()
 st.header("3. 存量管理 (Net Worth)")
@@ -204,47 +199,35 @@ st.write("📝 **直接點擊下方表格，編輯目前市值。** (單位: TWD
 
 col_bank, col_crypto, col_stock = st.columns(3)
 
-# 建立通用的編輯函數
 def render_asset_editor(title, session_key, icon):
     st.subheader(f"{icon} {title}")
     
-    # 1. 取得目前資料轉成 DataFrame
     current_data = st.session_state[session_key]
     df = pd.DataFrame(current_data)
     
-    # 確保即便是空的也有欄位名稱，避免報錯
     if df.empty:
         df = pd.DataFrame(columns=["項目", "金額"])
 
-    # 2. 顯示編輯器
     edited_df = st.data_editor(
         df,
         column_config={
             "項目": st.column_config.TextColumn("項目名稱", required=True),
             "金額": st.column_config.NumberColumn("目前市值", min_value=0, step=1000, format="$%d")
         },
-        num_rows="dynamic", # 允許新增刪除
+        num_rows="dynamic",
         use_container_width=True,
-        key=f"editor_{session_key}" # 每個區塊要有不同的 key
+        key=f"editor_{session_key}"
     )
     
-    # 3. 將編輯後的結果存回 Session State
-    # data_editor 回傳的就是新的 DataFrame
     st.session_state[session_key] = edited_df.to_dict('records')
-    
-    # 4. 回傳總金額
     total = edited_df["金額"].sum() if not edited_df.empty else 0
-    
-    # 顯示加總
     st.metric(f"小計", f"${total:,}")
     return total
 
-# 呼叫函數建立三個編輯區
 with col_bank: sum_bank = render_asset_editor("銀行 (Bank)", "asset_bank", "🏦")
 with col_crypto: sum_crypto = render_asset_editor("幣圈 (Crypto)", "asset_crypto", "₿")
 with col_stock: sum_stock = render_asset_editor("股票 (Stock)", "asset_stock", "📈")
 
-# 總資產計算
 net_worth = sum_bank + sum_crypto + sum_stock
 
 st.write("---")
@@ -271,10 +254,34 @@ with c_chart2:
         st.progress(safe_assets / net_worth, text=f"🛡️ 防禦型 (Bank): {safe_assets/net_worth*100:.1f}%")
 
 # ==========================================
-# 4. Excel 匯出
+# 4. Excel 匯出 (修復重點區)
 # ==========================================
 st.divider()
 df_flow = pd.DataFrame({
     "項目": ["總收入", "生活費", "投資", "隨機", "小孩"],
     "金額": [income, b_life, b_invest, b_random, b_kid],
-    "比例": ["100%", f"{p_life}%", f"{p_invest}%", f"{
+    "比例": ["100%", f"{p_life}%", f"{p_invest}%", f"{p_random}%", f"{p_kid}%"]
+})
+
+list_all_assets = []
+for i in st.session_state.asset_bank: list_all_assets.append({"類別": "銀行", "項目": i["項目"], "金額": i["金額"]})
+for i in st.session_state.asset_crypto: list_all_assets.append({"類別": "幣圈", "項目": i["項目"], "金額": i["金額"]})
+for i in st.session_state.asset_stock: list_all_assets.append({"類別": "股票", "項目": i["項目"], "金額": i["金額"]})
+df_assets_detail = pd.DataFrame(list_all_assets)
+df_assets_detail.loc[len(df_assets_detail)] = ["總計", "Net Worth", net_worth]
+
+buffer = io.BytesIO()
+with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
+    df_flow.to_excel(writer, sheet_name='1.本月流量', index=False)
+    if st.session_state.portfolio:
+        pd.DataFrame(st.session_state.portfolio).to_excel(writer, sheet_name='2.定期定額設定', index=False)
+    df_assets_detail.to_excel(writer, sheet_name='3.總資產細項', index=False)
+buffer.seek(0)
+curr_date = datetime.date.today().strftime("%Y%m%d")
+
+st.download_button(
+    label="📥 下載完整資產報表 (Excel)",
+    data=buffer,
+    file_name=f"Trader_Report_{curr_date}.xlsx",
+    mime="application/vnd.ms-excel"
+)
